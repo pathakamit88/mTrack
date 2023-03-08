@@ -116,7 +116,7 @@ func main() {
 	//defer logFile.Close()
 	//wrt := io.MultiWriter(logFile)
 	//log.SetOutput(wrt)
-	//log.SetFlags(log.Lshortfile | log.LstdFlags)
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
 	router := gin.Default()
 	router.GET("v1/messages", getMessages)
