@@ -105,12 +105,24 @@ var dateRe = regexp.MustCompile(`(?m)(\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d
 var timeRe = regexp.MustCompile(`(?m)\d{2}:\d{2}`)
 
 func main() {
-	router := gin.Default()
 
+	var err error
+	// Custom log file configuration.
+	//fileName := "mtrack.log"
+	//logFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+	//if err != nil {
+	//	log.Panic(err)
+	//}
+	//defer logFile.Close()
+	//wrt := io.MultiWriter(logFile)
+	//log.SetOutput(wrt)
+	//log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	router := gin.Default()
 	router.GET("v1/messages", getMessages)
 	router.POST("v1/messages", postMessage)
 
-	err := router.Run("localhost:8080")
+	err = router.Run("localhost:8080")
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +136,6 @@ func parseAmount(m string) (float64, error) {
 	amountStr := strings.Replace(m, ",", "", -1)
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
-		log.Println(err)
 		return 0, fmt.Errorf("parseAmount error: %v", err)
 	}
 	return amount, nil
@@ -193,7 +204,7 @@ func postMessage(c *gin.Context) {
 
 	bankName := bankRe.FindString(smsText)
 	if bankName == "" {
-		fmt.Println("Bank name not found in SMS ->"+
+		log.Println("Bank name not found in SMS ->"+
 			"", smsText)
 		c.String(http.StatusOK, "Bank name not found")
 		return
@@ -223,42 +234,42 @@ func postMessage(c *gin.Context) {
 
 	txTypeStr := tMap["txtype"]
 	if txTypeStr == "" {
-		fmt.Println("Transaction type not found in SMS ->", smsText)
+		log.Println("Transaction type not found in SMS ->", smsText)
 		c.String(http.StatusOK, "Transaction type not found")
 		return
 	}
 	txType := getTransactionType(txTypeStr)
 	if txType == "" {
-		fmt.Println("Transaction type parsing error ->", txTypeStr)
+		log.Println("Transaction type parsing error ->", txTypeStr)
 		c.String(http.StatusInternalServerError, "Transaction type parsing error")
 		return
 	}
 
 	amountStr := tMap["amount"]
 	if amountStr == "" {
-		fmt.Println("Transaction amount not found in SMS ->", smsText)
+		log.Println("Transaction amount not found in SMS ->", smsText)
 		amountStr = "0"
 	}
 	amount, err := parseAmount(amountStr)
 	if err != nil {
-		fmt.Println("Amount parse error ->", amountStr)
+		log.Println("Amount parse error ->", amountStr)
 		c.String(http.StatusInternalServerError, "Amount parsing error")
 		return
 	}
 
 	txDate, err := parseDateTime(tMap["date"], tMap["time"])
 	if err != nil {
-		fmt.Println("Date parse error ->", tMap["date"], tMap["time"], err)
+		log.Println("Date parse error ->", tMap["date"], tMap["time"], err)
 	}
 
 	balanceStr := tMap["balance"]
 	if balanceStr == "" {
-		//fmt.Println("Balance amount not found in SMS ->", smsText)
+		//log.Println("Balance amount not found in SMS ->", smsText)
 		balanceStr = "0"
 	}
 	balance, err := parseAmount(balanceStr)
 	if err != nil {
-		fmt.Println("Balance amount parse error ->", balanceStr)
+		log.Println("Balance amount parse error ->", balanceStr)
 		c.String(http.StatusInternalServerError, "Balance amount parsing error")
 		return
 	}
