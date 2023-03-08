@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/pathakamit88/mTrack/middleware"
 	"log"
 	"net/http"
 	"regexp"
@@ -106,11 +107,13 @@ var timeRe = regexp.MustCompile(`(?m)\d{2}:\d{2}`)
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	router := gin.Default()
-	router.GET("v1/messages", getMessages)
-	router.POST("v1/messages", postMessage)
+	r := gin.Default()
 
-	err := router.Run("localhost:8080")
+	authorized := r.Group("/", middleware.BasicAuthorization())
+	authorized.GET("v1/messages", getMessages)
+	authorized.POST("v1/messages", postMessage)
+
+	err := r.Run("localhost:8080")
 	if err != nil {
 		panic(err)
 	}
