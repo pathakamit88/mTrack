@@ -25,6 +25,9 @@ type message struct {
 	Bank     string    `json:"bank"`
 	Account  string    `json:"account"`
 	Amount   float64   `json:"amount"`
+	Sender   string    `json:"sender"`
+	Receiver string    `json:"receiver"`
+	Balance  float64   `json:"balance"`
 	DateTime time.Time `json:"time"`
 }
 
@@ -58,8 +61,9 @@ var patterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?m)Rs (?P<amount>[\d,.]+) (?P<txtype>\w+) from your A/c using UPI on (?P<date>[\w-]+) (?P<time>[\d:]+) (to|and) VPA (?P<receiver>[\w-.@]+)`),
 
 	// Federal bank credit
-	// Amit, you've received INR 9,000.00 in your Account XXXXXXXX9331. Woohoo! It was sent by 0111 on January 17, 2023. -Federal Bank
-	// Amit, you've received INR 2,000.00 in your Account XXXXXXXX9331. Woohoo! It was sent by 0000 on February 6, 2023. -Federal Bank
+	// Amit, you've received INR 9,000.00 in your Account XXXXXXXX1234. Woohoo! It was sent by 0111 on January 17, 2023. -Federal Bank
+	// Amit, you've received INR 2,000.00 in your Account XXXXXXXX0000. Woohoo! It was sent by 0000 on February 6, 2023. -Federal Bank
+	regexp.MustCompile(`(?m)you've (?P<txtype>\w+) INR (?P<amount>[\d,.]+) in your Account (?P<account>\w+). Woohoo! It was sent by (?P<sender>[\w]+) on (?P<date>[\w\s,-]+)`),
 
 	// Citibank debit
 	// Your Citibank A/c has been debited with INR 194.00 on 07-MAR-2023 at 17:22 and account paytmqr28100505010114n4k18nnfrt@paytm has been credited. UPI Ref no. 306655219320
@@ -82,15 +86,20 @@ var patterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?m)You've (?P<txtype>\w+) Rs.(?P<amount>[\d,.]+) On HDFC Bank CREDIT Card (?P<account>\w+) At (?P<receiver>[\w\s.]+) On (?P<date>[\d-]+):(?P<time>[\d:]+) Avl bal: Rs.(?P<balance>[\d,.]+)`),
 }
 
-var debitStrMap = map[string]bool{
-	"Spent":    true,
-	"spent":    true,
-	"debit":    true,
-	"debited":  true,
-	"from A/c": true}
+var debitStrMap = map[string]int{
+	"Spent":    1,
+	"spent":    1,
+	"debit":    1,
+	"debited":  1,
+	"from A/c": 1,
+}
+
+var creditStrMap = map[string]int{
+	"received": 1,
+}
 
 // (\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{2})
-var dateRe = regexp.MustCompile(`(?m)(\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{2})|(\d{2}-\w{3}-\d{4})|(\d{2}-\d{2}-\d{2})`)
+var dateRe = regexp.MustCompile(`(?m)(\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{2})|(\d{2}-\w{3}-\d{4})|(\d{2}-\d{2}-\d{2})|(\w+ \d+, \d{4})`)
 
 // \d{2}:\d{2}
 var timeRe = regexp.MustCompile(`(?m)\d{2}:\d{2}`)
@@ -123,74 +132,52 @@ func parseAmount(m string) (float64, error) {
 
 func parseDateTime(dt string, tm string) (time.Time, error) {
 	var t time.Time
+	var err error
+	loc, _ := time.LoadLocation("Asia/Kolkata")
 
-	dateStr := dateRe.FindStringSubmatch(dt)
-	if dateStr == nil {
+	dateStr := dateRe.FindString(dt)
+	if dateStr == "" {
 		return t, errors.New("no date string found")
 	}
 	tStr := timeRe.FindString(tm)
 	if tStr == "" {
-		tStr = "00:00"
+		tStr = time.Now().In(loc).Format("15:04")
 	}
 
-	if dateStr[1] != "" {
-		dd := dateStr[1] + " " + tStr
-		date, err := time.Parse("02-Jan-06 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
-		}
-		t = date
+	dateStr = dateStr + " " + tStr
+	var dateLayout = []string{
+		"02-Jan-06 15:04",
+		"02-01-2006 15:04",
+		"2006-01-02 15:04",
+		"02/01/06 15:04",
+		"02-Jan-2006 15:04",
+		"02-01-06 15:04",
+		"January 2, 2006 15:04",
 	}
-	if dateStr[2] != "" {
-		dd := dateStr[2] + " " + tStr
-		date, err := time.Parse("02-01-2006 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
+	for _, l := range dateLayout {
+		t, err = time.ParseInLocation(l, dateStr, loc)
+		if err == nil {
+			break
 		}
-		t = date
-	}
-	if dateStr[3] != "" {
-		dd := dateStr[3] + " " + tStr
-		date, err := time.Parse("2006-01-02 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
-		}
-		t = date
-	}
-	if dateStr[4] != "" {
-		dd := dateStr[4] + " " + tStr
-		date, err := time.Parse("02/01/06 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
-		}
-		t = date
-	}
-	if dateStr[5] != "" {
-		dd := dateStr[5] + " " + tStr
-		date, err := time.Parse("02-Jan-2006 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
-		}
-		t = date
-	}
-	if dateStr[6] != "" {
-		dd := dateStr[6] + " " + tStr
-		date, err := time.Parse("02-01-06 15:04", dd)
-		if err != nil {
-			return t, fmt.Errorf("time parse error %v", err)
-		}
-		t = date
-	}
 
+	}
+	if err != nil {
+		return time.Now().In(loc), err
+	}
 	return t, nil
 }
 
 func getTransactionType(t string) string {
+	var txType string
 	_, exist := debitStrMap[t]
 	if exist != false {
-		return txDebit
+		txType = txDebit
 	}
-	return ""
+	_, exist = creditStrMap[t]
+	if exist != false {
+		txType = txCredit
+	}
+	return txType
 }
 
 func postMessage(c *gin.Context) {
@@ -203,9 +190,11 @@ func postMessage(c *gin.Context) {
 		return
 	}
 	smsText := newSMS.M
+
 	bankName := bankRe.FindString(smsText)
 	if bankName == "" {
-		fmt.Println("Bank name not found in SMS:", smsText)
+		fmt.Println("Bank name not found in SMS ->"+
+			"", smsText)
 		c.String(http.StatusOK, "Bank name not found")
 		return
 	}
@@ -234,38 +223,53 @@ func postMessage(c *gin.Context) {
 
 	txTypeStr := tMap["txtype"]
 	if txTypeStr == "" {
-		fmt.Println("Transaction type not found in SMS", smsText)
+		fmt.Println("Transaction type not found in SMS ->", smsText)
 		c.String(http.StatusOK, "Transaction type not found")
 		return
 	}
 	txType := getTransactionType(txTypeStr)
 	if txType == "" {
-		fmt.Println("Transaction type parsing error", txTypeStr)
+		fmt.Println("Transaction type parsing error ->", txTypeStr)
 		c.String(http.StatusInternalServerError, "Transaction type parsing error")
 		return
 	}
 
 	amountStr := tMap["amount"]
 	if amountStr == "" {
-		fmt.Println("Transaction amount not found in SMS", smsText)
+		fmt.Println("Transaction amount not found in SMS ->", smsText)
 		amountStr = "0"
 	}
 	amount, err := parseAmount(amountStr)
 	if err != nil {
-		fmt.Println("Amount parse error:", amountStr)
+		fmt.Println("Amount parse error ->", amountStr)
 		c.String(http.StatusInternalServerError, "Amount parsing error")
 		return
 	}
+
 	txDate, err := parseDateTime(tMap["date"], tMap["time"])
 	if err != nil {
-		fmt.Println("Date parse error:", tMap["date"], tMap["time"], err)
-		txDate = time.Now()
+		fmt.Println("Date parse error ->", tMap["date"], tMap["time"], err)
 	}
+
+	balanceStr := tMap["balance"]
+	if balanceStr == "" {
+		//fmt.Println("Balance amount not found in SMS ->", smsText)
+		balanceStr = "0"
+	}
+	balance, err := parseAmount(balanceStr)
+	if err != nil {
+		fmt.Println("Balance amount parse error ->", balanceStr)
+		c.String(http.StatusInternalServerError, "Balance amount parsing error")
+		return
+	}
+
 	msg.Amount = amount
 	msg.TxType = txType
 	msg.Bank = bankName
 	msg.Account = tMap["account"]
 	msg.DateTime = txDate
+	msg.Receiver = tMap["receiver"]
+	msg.Balance = balance
 
 	c.IndentedJSON(http.StatusCreated, msg)
 }
