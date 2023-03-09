@@ -2,9 +2,6 @@ package handler
 
 import "regexp"
 
-// ICICI|Federal|SBI
-var bankRe = regexp.MustCompile(`(?m)ICICI|Federal|SBI|HDFC|Citi|Axis`)
-
 var debitStrMap = map[string]int{
 	"Spent":    1,
 	"spent":    1,
@@ -16,6 +13,9 @@ var debitStrMap = map[string]int{
 var creditStrMap = map[string]int{
 	"received": 1,
 }
+
+// ICICI|Federal|SBI
+var bankRe = regexp.MustCompile(`(?m)ICICI|Federal|SBI|HDFC|Citi|Axis`)
 
 // (\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{2})
 var dateRe = regexp.MustCompile(`(?m)(\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{4}-\d{2}-\d{2})|(\d{2}/\d{2}/\d{2})|(\d{2}-\w{3}-\d{4})|(\d{2}-\d{2}-\d{2})|(\w+ \d+, \d{4})`)
