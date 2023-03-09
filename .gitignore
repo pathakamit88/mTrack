@@ -1,3 +1,5 @@
 .idea
 authkey.txt
 mTrack
+deploy.sh
+*.log

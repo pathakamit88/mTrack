@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pathakamit88/mTrack/middleware"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -105,7 +107,20 @@ var dateRe = regexp.MustCompile(`(?m)(\d{2}-\w{3}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d
 var timeRe = regexp.MustCompile(`(?m)\d{2}:\d{2}`)
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	gin.ForceConsoleColor()
+
+	if os.Getenv("GIN_MODE") == "release" {
+		f, err := os.OpenFile("mtrack.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+		log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+		w, _ := os.Create("requests.log")
+		gin.DefaultWriter = io.MultiWriter(w)
+	}
 
 	r := gin.Default()
 
@@ -243,7 +258,7 @@ func postMessage(c *gin.Context) {
 	}
 	amount, err := parseAmount(amountStr)
 	if err != nil {
-		log.Println("Amount parse error ->", amountStr)
+		log.Println("Amount parse error ->", amountStr, smsText)
 		c.String(http.StatusInternalServerError, "Amount parsing error")
 		return
 	}
