@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"github.com/pathakamit88/txsms"
 	"strconv"
 	"strings"
 	"time"
@@ -25,11 +26,11 @@ func parseDateTime(dt string, tm string) (time.Time, error) {
 	var err error
 	loc, _ := time.LoadLocation("Asia/Kolkata")
 
-	dateStr := dateRe.FindString(dt)
+	dateStr := txsms.DateRe.FindString(dt)
 	if dateStr == "" {
 		return t, errors.New("no date string found")
 	}
-	tStr := timeRe.FindString(tm)
+	tStr := txsms.TimeRe.FindString(tm)
 	if tStr == "" {
 		tStr = time.Now().In(loc).Format("15:04")
 	}
@@ -59,11 +60,11 @@ func parseDateTime(dt string, tm string) (time.Time, error) {
 
 func parseTransactionType(t string) string {
 	var txType string
-	_, exist := debitStrMap[t]
+	_, exist := txsms.DebitStrMap[t]
 	if exist != false {
 		txType = txDebit
 	}
-	_, exist = creditStrMap[t]
+	_, exist = txsms.CreditStrMap[t]
 	if exist != false {
 		txType = txCredit
 	}

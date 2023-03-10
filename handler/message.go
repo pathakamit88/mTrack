@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/pathakamit88/txsms"
 	"log"
 	"net/http"
 	"time"
@@ -39,7 +40,7 @@ func PostMessage(c *gin.Context) {
 	}
 	smsText := newSMS.M
 
-	bankName := bankRe.FindString(smsText)
+	bankName := txsms.BankRe.FindString(smsText)
 	if bankName == "" {
 		log.Println("Bank name not found in SMS ->"+
 			"", smsText)
@@ -56,7 +57,7 @@ func PostMessage(c *gin.Context) {
 		"receiver": "",
 		"balance":  "",
 	}
-	for _, p := range patterns {
+	for _, p := range txsms.SmsPatternsRe {
 		matches := p.FindStringSubmatch(smsText)
 		if matches != nil {
 			names := p.SubexpNames()
