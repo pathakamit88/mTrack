@@ -42,9 +42,7 @@ func PostMessage(c *gin.Context) {
 
 	bankName := txsms.BankRe.FindString(smsText)
 	if bankName == "" {
-		log.Println("Bank name not found in SMS ->"+
-			"", smsText)
-		c.String(http.StatusOK, "Bank name not found")
+		c.Status(http.StatusOK)
 		return
 	}
 
@@ -72,7 +70,7 @@ func PostMessage(c *gin.Context) {
 
 	txTypeStr := tMap["txtype"]
 	if txTypeStr == "" {
-		log.Println("Transaction type not found in SMS ->", smsText)
+		log.Println("Transaction type not found in SMS", smsText)
 		c.String(http.StatusOK, "Transaction type not found")
 		return
 	}
@@ -119,5 +117,6 @@ func PostMessage(c *gin.Context) {
 	msg.Receiver = tMap["receiver"]
 	msg.Balance = balance
 
+	messages = append(messages, msg)
 	c.IndentedJSON(http.StatusCreated, msg)
 }
